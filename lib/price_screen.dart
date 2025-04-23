@@ -1,9 +1,7 @@
-import 'package:bitcoin_ticker_flutter/coin_data.dart';
-import 'package:bitcoin_ticker_flutter/services/network.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform, kIsWeb;
+import 'coin_data.dart';
+import 'dart:io' show Platform;
 
 class PriceScreen extends StatefulWidget {
   const PriceScreen({super.key});
@@ -14,19 +12,13 @@ class PriceScreen extends StatefulWidget {
 }
 
 class _PriceScreenState extends State<PriceScreen> {
-  String selectedCurrency = 'USD';
-  double usdExchangedRate = 0;
+  String selectedCurrency = 'AUD';
 
-  Network networkHelper = Network();
-
-  DropdownButton<String> getAndroidDropdownButton() {
+  DropdownButton<String> androidDropdown() {
     List<DropdownMenuItem<String>> dropdownItems = [];
     for (String currency in currenciesList) {
-      DropdownMenuItem<String> newMenuItem = DropdownMenuItem(
-        value: currency,
-        child: Text(currency),
-      );
-      dropdownItems.add(newMenuItem);
+      var newItem = DropdownMenuItem(value: currency, child: Text(currency));
+      dropdownItems.add(newItem);
     }
 
     return DropdownButton<String>(
@@ -34,15 +26,15 @@ class _PriceScreenState extends State<PriceScreen> {
       items: dropdownItems,
       onChanged: (value) {
         setState(() {
-          selectedCurrency = value ?? '';
+          selectedCurrency = value!;
+          getData();
         });
       },
     );
   }
 
-  CupertinoPicker getiOSPicker() {
+  CupertinoPicker iOSPicker() {
     List<Text> pickerItems = [];
-
     for (String currency in currenciesList) {
       pickerItems.add(Text(currency));
     }
@@ -53,119 +45,87 @@ class _PriceScreenState extends State<PriceScreen> {
       onSelectedItemChanged: (selectedIndex) {
         setState(() {
           selectedCurrency = currenciesList[selectedIndex];
-          handleNetworkCall('BTC');
-          handleNetworkCall('ETH');
-          handleNetworkCall('LTC');
+          getData();
         });
       },
       children: pickerItems,
     );
   }
 
-  Widget getPicker() {
-    if (kIsWeb) {
-      return getAndroidDropdownButton(); // Default to Android style for web
-    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return getiOSPicker();
-    } else {
-      return getAndroidDropdownButton();
+  //value had to be updated into a Map to store the values of all three cryptocurrencies.
+  Map<String, String> coinValues = {};
+  //7: Figure out a way of displaying a '?' on screen while we're waiting for the price data to come back. First we have to create a variable to keep track of when we're waiting on the request to complete.
+  bool isWaiting = false;
+
+  void getData() async {
+    //7: Second, we set it to true when we initiate the request for prices.
+    isWaiting = true;
+    try {
+      //6: Update this method to receive a Map containing the crypto:price key value pairs.
+      var data = await CoinData().getCoinData(selectedCurrency);
+      //7. Third, as soon the above line of code completes, we now have the data and no longer need to wait. So we can set isWaiting to false.
+      isWaiting = false;
+      setState(() {
+        coinValues = data;
+      });
+    } catch (e) {
+      print(e);
     }
   }
 
-  void handleNetworkCall(String cryptoCurrency) async {
-    usdExchangedRate = await networkHelper.fetchExchangeRate(
-      crypto: cryptoMap[cryptoCurrency]!,
-      currency: selectedCurrency,
-    );
+  @override
+  void initState() {
+    super.initState();
+    getData();
   }
+
+  ////For bonus points, create a method that loops through the cryptoList and generates a CryptoCard for each. Call makeCards() in the build() method instead of the Column with 3 CryptoCards.
+  //  Column makeCards() {
+  //    List<CryptoCard> cryptoCards = [];
+  //    for (String crypto in cryptoList) {
+  //      cryptoCards.add(
+  //        CryptoCard(
+  //          cryptoCurrency: crypto,
+  //          selectedCurrency: selectedCurrency,
+  //          value: isWaiting ? '?' : coinValues[crypto],
+  //        ),
+  //      );
+  //    }
+  //    return Column(
+  //      crossAxisAlignment: CrossAxisAlignment.stretch,
+  //      children: cryptoCards,
+  //    );
+  //  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('🤑 Coin Ticker'),
-        backgroundColor: Colors.lightBlue,
-      ),
+      appBar: AppBar(title: Text('🤑 Coin Ticker')),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(
-            padding: EdgeInsets.fromLTRB(18.0, 18.0, 18.0, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Card(
-                  color: Colors.lightBlueAccent,
-                  elevation: 5.0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 15.0,
-                      horizontal: 28.0,
-                    ),
-                    child: TextButton(
-                      onPressed: () {
-                        handleNetworkCall('BTC');
-                      },
-                      child: Text(
-                        '1 BTC =  ${usdExchangedRate.toString()} $selectedCurrency',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20.0, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-                Card(
-                  color: Colors.lightBlueAccent,
-                  elevation: 5.0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 15.0,
-                      horizontal: 28.0,
-                    ),
-                    child: TextButton(
-                      onPressed: () {
-                        handleNetworkCall('ETH');
-                      },
-                      child: Text(
-                        '1 ETH =  ${usdExchangedRate.toString()} $selectedCurrency',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20.0, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-                Card(
-                  color: Colors.lightBlueAccent,
-                  elevation: 5.0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 15.0,
-                      horizontal: 28.0,
-                    ),
-                    child: TextButton(
-                      onPressed: () {
-                        handleNetworkCall('LTC');
-                      },
-                      child: Text(
-                        '1 LTC =  ${usdExchangedRate.toString()} $selectedCurrency',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20.0, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          //3: You'll need to use a Column Widget to contain the three CryptoCards.
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              CryptoCard(
+                cryptoCurrency: 'BTC',
+                //7. Finally, we use a ternary operator to check if we are waiting and if so, we'll display a '?' otherwise we'll show the actual price data.
+                value: isWaiting ? '?' : coinValues['BTC']!,
+                selectedCurrency: selectedCurrency,
+              ),
+              CryptoCard(
+                cryptoCurrency: 'ETH',
+                value: isWaiting ? '?' : coinValues['ETH']!,
+                selectedCurrency: selectedCurrency,
+              ),
+              CryptoCard(
+                cryptoCurrency: 'LTC',
+                value: isWaiting ? '?' : coinValues['LTC']!,
+                selectedCurrency: selectedCurrency,
+              ),
+            ],
           ),
 
           Container(
@@ -173,13 +133,233 @@ class _PriceScreenState extends State<PriceScreen> {
             alignment: Alignment.center,
             padding: EdgeInsets.only(bottom: 30.0),
             color: Colors.lightBlue,
-            child:
-                defaultTargetPlatform == TargetPlatform.iOS
-                    ? getiOSPicker()
-                    : getAndroidDropdownButton(),
+            child: Platform.isIOS ? iOSPicker() : androidDropdown(),
           ),
         ],
       ),
     );
   }
 }
+
+//1: Refactor this Padding Widget into a separate Stateless Widget called CryptoCard, so we can create 3 of them, one for each cryptocurrency.
+class CryptoCard extends StatelessWidget {
+  //2: You'll need to able to pass the selectedCurrency, value and cryptoCurrency to the constructor of this CryptoCard Widget.
+  const CryptoCard({
+    super.key,
+    required this.value,
+    required this.selectedCurrency,
+    required this.cryptoCurrency,
+  });
+
+  final String value;
+  final String selectedCurrency;
+  final String cryptoCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(18.0, 18.0, 18.0, 0),
+      child: Card(
+        color: Colors.lightBlueAccent,
+        elevation: 5.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 15.0, horizontal: 28.0),
+          child: Text(
+            '1 $cryptoCurrency = $value $selectedCurrency',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 20.0, color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// import 'package:bitcoin_ticker_flutter/coin_data.dart';
+// import 'package:bitcoin_ticker_flutter/services/network.dart';
+// import 'package:flutter/material.dart';
+// import 'package:flutter/cupertino.dart';
+// import 'package:flutter/foundation.dart'
+//     show defaultTargetPlatform, TargetPlatform, kIsWeb;
+
+// class PriceScreen extends StatefulWidget {
+//   const PriceScreen({super.key});
+
+//   @override
+//   // ignore: library_private_types_in_public_api
+//   _PriceScreenState createState() => _PriceScreenState();
+// }
+
+// class _PriceScreenState extends State<PriceScreen> {
+//   String selectedCurrency = 'USD';
+//   double usdExchangedRate = 0;
+
+//   Network networkHelper = Network();
+
+//   DropdownButton<String> getAndroidDropdownButton() {
+//     List<DropdownMenuItem<String>> dropdownItems = [];
+//     for (String currency in currenciesList) {
+//       DropdownMenuItem<String> newMenuItem = DropdownMenuItem(
+//         value: currency,
+//         child: Text(currency),
+//       );
+//       dropdownItems.add(newMenuItem);
+//     }
+
+//     return DropdownButton<String>(
+//       value: selectedCurrency,
+//       items: dropdownItems,
+//       onChanged: (value) {
+//         setState(() {
+//           selectedCurrency = value ?? '';
+//         });
+//       },
+//     );
+//   }
+
+//   CupertinoPicker getiOSPicker() {
+//     List<Text> pickerItems = [];
+
+//     for (String currency in currenciesList) {
+//       pickerItems.add(Text(currency));
+//     }
+
+//     return CupertinoPicker(
+//       backgroundColor: Colors.lightBlue,
+//       itemExtent: 32.0,
+//       onSelectedItemChanged: (selectedIndex) {
+//         setState(() {
+//           selectedCurrency = currenciesList[selectedIndex];
+//           handleNetworkCall('BTC');
+//           handleNetworkCall('ETH');
+//           handleNetworkCall('LTC');
+//         });
+//       },
+//       children: pickerItems,
+//     );
+//   }
+
+//   Widget getPicker() {
+//     if (kIsWeb) {
+//       return getAndroidDropdownButton(); // Default to Android style for web
+//     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+//       return getiOSPicker();
+//     } else {
+//       return getAndroidDropdownButton();
+//     }
+//   }
+
+//   void handleNetworkCall(String cryptoCurrency) async {
+//     usdExchangedRate = await networkHelper.fetchExchangeRate(
+//       crypto: cryptoMap[cryptoCurrency]!,
+//       currency: selectedCurrency,
+//     );
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: Text('🤑 Coin Ticker'),
+//         backgroundColor: Colors.lightBlue,
+//       ),
+//       body: Column(
+//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//         crossAxisAlignment: CrossAxisAlignment.stretch,
+//         children: <Widget>[
+//           Padding(
+//             padding: EdgeInsets.fromLTRB(18.0, 18.0, 18.0, 0),
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.stretch,
+//               children: [
+//                 Card(
+//                   color: Colors.lightBlueAccent,
+//                   elevation: 5.0,
+//                   shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(10.0),
+//                   ),
+//                   child: Padding(
+//                     padding: EdgeInsets.symmetric(
+//                       vertical: 15.0,
+//                       horizontal: 28.0,
+//                     ),
+//                     child: TextButton(
+//                       onPressed: () {
+//                         handleNetworkCall('BTC');
+//                       },
+//                       child: Text(
+//                         '1 BTC =  ${usdExchangedRate.toString()} $selectedCurrency',
+//                         textAlign: TextAlign.center,
+//                         style: TextStyle(fontSize: 20.0, color: Colors.white),
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//                 Card(
+//                   color: Colors.lightBlueAccent,
+//                   elevation: 5.0,
+//                   shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(10.0),
+//                   ),
+//                   child: Padding(
+//                     padding: EdgeInsets.symmetric(
+//                       vertical: 15.0,
+//                       horizontal: 28.0,
+//                     ),
+//                     child: TextButton(
+//                       onPressed: () {
+//                         handleNetworkCall('ETH');
+//                       },
+//                       child: Text(
+//                         '1 ETH =  ${usdExchangedRate.toString()} $selectedCurrency',
+//                         textAlign: TextAlign.center,
+//                         style: TextStyle(fontSize: 20.0, color: Colors.white),
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//                 Card(
+//                   color: Colors.lightBlueAccent,
+//                   elevation: 5.0,
+//                   shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(10.0),
+//                   ),
+//                   child: Padding(
+//                     padding: EdgeInsets.symmetric(
+//                       vertical: 15.0,
+//                       horizontal: 28.0,
+//                     ),
+//                     child: TextButton(
+//                       onPressed: () {
+//                         handleNetworkCall('LTC');
+//                       },
+//                       child: Text(
+//                         '1 LTC =  ${usdExchangedRate.toString()} $selectedCurrency',
+//                         textAlign: TextAlign.center,
+//                         style: TextStyle(fontSize: 20.0, color: Colors.white),
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+
+//           Container(
+//             height: 150.0,
+//             alignment: Alignment.center,
+//             padding: EdgeInsets.only(bottom: 30.0),
+//             color: Colors.lightBlue,
+//             child:
+//                 defaultTargetPlatform == TargetPlatform.iOS
+//                     ? getiOSPicker()
+//                     : getAndroidDropdownButton(),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
